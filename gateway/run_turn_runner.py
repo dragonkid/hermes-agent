@@ -472,12 +472,13 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
                 if live is not None:
                     live.event_stream.publish(session_id, {"text": str(message)}, event_type="review.summary")
                 return
-            if self._status_live():
-                self._send_status_text(
-                    message,
-                    _interim_metadata(_non_conversational_metadata(ctx._status_thread_metadata, platform=ctx.source.platform)),
-                    "background_review_callback scheduling error",
-                )
+            if not self._ctx._status_adapter:
+                return
+            self._send_status_text(
+                message,
+                _interim_metadata(_non_conversational_metadata(ctx._status_thread_metadata, platform=ctx.source.platform)),
+                "background_review_callback scheduling error",
+            )
 
         def release() -> None:
             release_evt.set()
@@ -501,13 +502,15 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
                     time.sleep(0.05)
                 deliver(message)
                 return
-            if not self._status_live():
-                return
             if not release_evt.is_set():
                 with pending_lock:
                     if not release_evt.is_set():
                         pending.append(message)
                         return
+            # A review summary is post-turn bookkeeping, not turn output: deliver it even
+            # when a newer turn owns the session (the old _status_live() fence silently
+            # dropped every summary from a review that outlived its turn — a /refine that
+            # finishes minutes later could never report back).
             deliver(message)
 
         return send, release
