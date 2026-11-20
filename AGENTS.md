@@ -1354,3 +1354,28 @@ not the specific names.
 
 Reviewers should reject new change-detector tests; authors should convert
 them into invariants before re-requesting review.
+
+---
+
+## Cursor Cloud specific instructions
+
+The Cloud Agent base image already provides Node.js 22, ripgrep, ffmpeg, git,
+and git-lfs. It does not provide `uv` or a Python 3.11 toolchain. System
+`python3` is 3.12; CI and `uv.lock` install CPython 3.11.
+
+- Python: `uv sync --locked --python 3.11 --extra all --extra dev` from the
+  repo root. That creates `.venv`, which `scripts/run_tests.sh` probes first.
+- JavaScript: `npm ci` at the repo root (workspaces for `ui-tui`, `web`, and
+  `apps/*`). The docs site has its own lockfile: `npm ci --prefix website`.
+- Before `npm test` in `ui-tui`, build the local Ink package. Vitest imports
+  `ui-tui/packages/hermes-ink/dist/entry-exports.js`, and that `dist/` is
+  gitignored: `npm run build --prefix ui-tui/packages/hermes-ink`.
+- `hermes doctor`, `scripts/run_tests.sh`, and `hermes dashboard` do not need
+  an LLM API key. Put provider keys in `~/.hermes/.env` only for live model
+  calls.
+- Bundled skills are copied into `~/.hermes/skills` by
+  `tools.skills_sync.sync_skills` (also run on dashboard and chat startup).
+  `hermes skills list` shows them after that sync.
+- Dashboard, when you need it: `hermes dashboard --host 127.0.0.1 --port 8787
+  --no-open`. Drop `--skip-build` unless `hermes_cli/web_dist/index.html`
+  already exists.
